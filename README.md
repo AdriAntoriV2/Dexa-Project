@@ -6,11 +6,11 @@ The project consists of four repositories: two role-specific web applications, a
 
 ## Project Overview
 
-Dexa provides separate interfaces for employees and HR personnel while centralizing business logic in a backend API. Employee profile changes are also communicated to an independent audit service through RabbitMQ, allowing audit records to be processed separately from the main application.
+Dexa provides separate interfaces for employees and HR personnel while centralizing business logic in a backend API. Employee profile changes can also be communicated to an independent audit service through RabbitMQ, allowing audit records to be processed separately from the main application.
 
 ### Key Features
 
-- **Employee portal** — employee authentication, profile management, password management, attendance actions, and attendance history and summaries.
+- **Employee portal** — authentication, profile management, password management, attendance actions, and attendance history and summaries.
 - **HR portal** — dashboard statistics, employee management, attendance monitoring, and notifications.
 - **REST API** — centralized authentication, employee and attendance operations, and role-based access control.
 - **Asynchronous auditing** — RabbitMQ events connect employee profile changes to an independent audit worker.
@@ -51,9 +51,7 @@ flowchart TD
 2. **The backend handles business operations.** The NestJS API authenticates requests, enforces access permissions, and processes employee and attendance operations.
 3. **Application data is persisted.** The backend uses PostgreSQL with Prisma for database access.
 4. **Profile changes generate events.** The backend publishes employee profile-change events through RabbitMQ.
-5. **The audit service processes events independently.** The worker consumes `employee.profile.changed` messages and stores audit records in its own database.
-
-This separation keeps the user interfaces, core business logic, and audit processing in distinct components, making each repository easier to develop, test, and maintain independently.
+5. **The audit service processes events independently.** The worker consumes messages and stores audit records in its own database.
 
 ## Repository Structure
 
@@ -93,6 +91,126 @@ This separation keeps the user interfaces, core business logic, and audit proces
 - Independent audit worker
 - Dedicated audit database
 
+## Getting Started
+
+The `dexa-project` repository provides Windows batch scripts to install and run all four applications from one directory.
+
+### Prerequisites
+
+Install the following before starting:
+
+- **Windows** — the supplied `.bat` scripts are designed for Windows.
+- **Git** — to clone the four application repositories.
+- **Node.js 24.x** — the installation script checks for Node.js major version 24.
+- **npm** — included with Node.js.
+- **Environment configuration** — valid credentials and connection strings for the application database, audit database, RabbitMQ, and frontend API configuration.
+
+The database and messaging services must be reachable using the configured environment variables. The scripts do not provision hosted databases or RabbitMQ instances.
+
+### 1. Prepare the Project Directory
+
+Clone this orchestration repository, or place the provided project files in a directory named `dexa-project`.
+
+The expected directory structure before installation is:
+
+```text
+dexa-project/
+├── env/
+│   ├── .env-backend
+│   ├── .env-audit
+│   ├── .env-employees
+│   └── .env-hr
+├── install-dexa.bat
+├── run-dexa.bat
+├── README.md
+└── .gitignore
+```
+
+The `env` directory contains the environment files used by the installer. Make sure each file contains the configuration required by its corresponding application.
+
+Do not commit real credentials, API keys, tokens, or database connection strings to Git.
+
+### 2. Install All Applications
+
+Open Command Prompt in the `dexa-project` directory and execute:
+
+```bat
+install-dexa.bat
+```
+
+The installation script automates the following steps:
+
+1. Checks the required tools and Node.js version.
+2. Clones the four application repositories into the project directory, reusing existing clones when available.
+3. Copies each environment file into its corresponding repository as `.env`, preserving the original files inside `env`.
+4. Installs dependencies using the available lockfile when possible.
+5. Generates the Prisma client for the backend.
+6. Starts the backend API, audit worker, and both frontend applications.
+7. Opens the employee and HR portals in the browser.
+
+The installer expects these repositories:
+
+- [Dexa Backend](https://github.com/AdriAntoriV2/dexa-backend)
+- [Dexa Audit](https://github.com/AdriAntoriV2/dexa-audit)
+- [Dexa Employees](https://github.com/AdriAntoriV2/dexa-employees)
+- [Dexa HR](https://github.com/AdriAntoriV2/dexa-hr)
+
+If a repository already exists, the script reuses it rather than cloning it again. Existing `.env` files are preserved by the installer, so update them manually when configuration changes are required.
+
+### 3. Access the Applications
+
+Once the services have started, use the following local URLs:
+
+| Component | URL |
+|---|---|
+| Employee portal | [http://localhost:5173](http://localhost:5173) |
+| HR portal | [http://localhost:5174](http://localhost:5174) |
+| Backend API | [http://localhost:3000](http://localhost:3000) |
+| Swagger API documentation | [http://localhost:3000/docs](http://localhost:3000/docs) |
+
+The audit service runs as a background worker and does not provide a frontend page.
+
+The employee and HR portals depend on the backend API. Audit processing also requires a valid RabbitMQ connection and the audit database configuration.
+
+### 4. Run the Applications Again
+
+After the initial installation, use:
+
+```bat
+run-dexa.bat
+```
+
+This script starts the existing backend, audit worker, employee portal, and HR portal.
+
+Unlike `install-dexa.bat`, the run script does not clone repositories, install dependencies, copy environment files, or regenerate the Prisma client.
+
+Before using it, make sure the initial installation has completed successfully and each repository has its required `.env` file and installed dependencies.
+
+### 5. Updating Configuration
+
+Environment files are stored in the root `env` directory:
+
+| File | Application |
+|---|---|
+| `env/.env-backend` | Backend API |
+| `env/.env-audit` | Audit worker |
+| `env/.env-employees` | Employee portal |
+| `env/.env-hr` | HR portal |
+
+The installer copies these files into the corresponding repositories as `.env` files. Editing the files in `env` does not automatically update the copies already present inside each repository. After changing configuration, update the corresponding application's `.env` file as well.
+
+Restart the affected application after changing environment variables.
+
+### Troubleshooting
+
+- **Node.js version check fails:** Install Node.js 24.x and reopen Command Prompt.
+- **A repository fails to clone:** Verify Git is installed and the GitHub repositories are accessible.
+- **An application cannot connect to the database:** Check the corresponding `.env` file and confirm the database connection string is valid.
+- **The frontend cannot reach the API:** Verify the backend is running and the frontend API URL is configured correctly.
+- **Swagger does not load:** Check that the backend started successfully and is listening on port `3000`.
+- **Notifications or audit events do not appear:** Verify RabbitMQ connectivity and the audit worker's configuration.
+- **A dependency or Prisma error occurs:** Review the terminal output for the failing application and rerun the installation after resolving the underlying issue.
+
 ## Engineering Highlights
 
 ### Separation of Responsibilities
@@ -110,19 +228,6 @@ RabbitMQ decouples profile-change event publishing from audit processing. The au
 ### API Documentation and Testing
 
 The backend provides Swagger documentation for exploring API endpoints. Automated tests across the project help verify application behavior and support maintainable development.
-
-## Getting Started
-
-Dexa is split across four repositories, so each component has its own dependencies and configuration.
-
-1. Clone the repository you want to explore from the links above.
-2. Follow its README for installation, environment variables, and startup instructions.
-3. Configure the backend database and required services.
-4. Start the backend API and the required messaging infrastructure.
-5. Start the employee or HR frontend and configure its API base URL.
-6. Start the audit worker and configure RabbitMQ and its audit database if you want to run the complete event-processing flow.
-
-The backend API and messaging infrastructure must be available for features that depend on them. Environment variables, credentials, and deployment-specific values should be configured locally rather than committed to source control.
 
 ## Project Goals
 
