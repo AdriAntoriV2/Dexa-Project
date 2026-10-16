@@ -231,12 +231,39 @@ del "%NODE_MSI%" >nul 2>&1
 if exist "%ProgramFiles%\nodejs\node.exe" set "PATH=%ProgramFiles%\nodejs;%PATH%"
 if exist "%ProgramFiles(x86)%\nodejs\node.exe" set "PATH=%ProgramFiles(x86)%\nodejs;%PATH%"
 
-call :check_node
-if not errorlevel 1 exit /b 0
+set "NODE_VERSION="
+set "NODE_MAJOR="
+set "NPM_VERSION="
 
-echo [ERROR] Node.js installation completed, but Node.js 24 and npm could not be verified.
-echo Close this window, open a new CMD, and check your PATH.
-exit /b 1
+where node >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Node.js is not available in PATH after installation.
+    exit /b 1
+)
+
+for /f "delims=" %%V in ('node -p "process.versions.node" 2^>nul') do set "NODE_VERSION=%%V"
+for /f "tokens=1 delims=." %%V in ("%NODE_VERSION%") do set "NODE_MAJOR=%%V"
+
+if not "%NODE_MAJOR%"=="%REQUIRED_NODE_MAJOR%" (
+    echo [ERROR] Expected Node.js 24.x but detected %NODE_VERSION%.
+    exit /b 1
+)
+
+where npm >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] npm is not available in PATH after installation.
+    exit /b 1
+)
+
+for /f "delims=" %%V in ('npm --version 2^>nul') do set "NPM_VERSION=%%V"
+if not defined NPM_VERSION (
+    echo [ERROR] npm could not be executed.
+    exit /b 1
+)
+
+echo [OK] Node.js %NODE_VERSION%
+echo [OK] npm %NPM_VERSION%
+exit /b 0
 
 :clone_repo
 if exist "%PARENT%\%~1\.git\" (
